@@ -1,5 +1,6 @@
 const express = require("express");
 const bcrypt = require('bcrypt');
+const jwt = require('jsonwebtoken');
 
 require("dotenv").config();
 
@@ -60,12 +61,15 @@ const user = sequelize.define("user", {
   password: {
     type: DataTypes.STRING,
     allowNull: false
+  },
+  isFirstLogin: {
+    type: DataTypes.BOOLEAN,
+    allowNull: false
   }
 })
 
 
 //HTTP METHODS
-
 //GET
 app.get("/get-items", async (req, res) => {
   try {
@@ -77,23 +81,32 @@ app.get("/get-items", async (req, res) => {
   }
 });
 
-
 //POST
-app.post("/create-user", async (req, res)=> {
-    const {username, password} = req.body;
+app.post("/create-user", async (req, res) => {
+  const { username, password } = req.body;
 
-    try{
-      const newUser = await user.create({
-        username,
-        password
-      });
-      res.status(201).json(newUser);
-    } catch(err){
-      console.error(err);
-      res.status(500).send("Error inserting the new user");
+  try {
+
+    const existingUser = await user.findOne({ where: { username } });
+    if (existingUser) {
+      return res.status(400).send("Username already taken");
     }
-})
 
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const newUser = await user.create({
+      username,
+      password: hashedPassword,
+      isFirstLogin: true
+    });
+
+    res.status(201).json(newUser);
+  } catch (err) {
+    console.error(err);
+    res.status(500).send("Error inserting the new user");
+  }
+});
+
+//CREATE ITEM
 app.post("/create-item", async (req, res) => {
     const { name, isInStock, isInChart } = req.body;
   
@@ -109,6 +122,29 @@ app.post("/create-item", async (req, res) => {
       res.status(500).send("Error inserting the item");
     }
   });
+
+//AUTH USER
+app.post("/auth", async (req, res) => {
+  const { username, password } = req.body;
+
+  try {
+    const foundUser = await user.findOne({ where: { username } });
+
+    if (foundUser && await bcrypt.compare(password, foundUser.password)) {
+
+      res.status(200).json({
+        message: "Authentication successful",
+        username: foundUser.username,
+        isFirstLogin: foundUser.isFirstLogin
+      });
+    } else {
+      res.status(401).send("Invalid username or password");
+    }
+  } catch (err) {
+    console.error(err);
+    res.status(500).send("Error during authentication");
+  }
+});
 
   //DELETE
 app.delete("/delete-item/:id", async (req, res) => {
@@ -133,3 +169,4 @@ app.delete("/delete-item/:id", async (req, res) => {
 app.listen(port, () => {
     console.log(`App running on http://localhost:${port}`);
 });
+
