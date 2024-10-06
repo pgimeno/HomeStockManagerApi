@@ -1,4 +1,5 @@
 const express = require("express");
+const bcrypt = require('bcrypt');
 
 require("dotenv").config();
 
@@ -22,8 +23,9 @@ sequelize.sync({ alter: true }).then(() => {
     console.log("Database synced");
   }).catch(err => console.error("Error syncing database:", err));
 
-// app.get("/", (req, res) => {res.send("Hello World!")});
 
+  /*Table definitions*/
+  //Items
 const item = sequelize.define("item", {
     id:{
         type: DataTypes.INTEGER,
@@ -44,7 +46,54 @@ const item = sequelize.define("item", {
     },
 })
 
-// POST INSERT ITEM
+//Users
+const user = sequelize.define("user", {
+  id: {
+    type: DataTypes.INTEGER,
+    primaryKey: true,
+    autoIncrement: true
+  },
+  username: {
+    type: DataTypes.STRING,
+    allowNull: false
+  },
+  password: {
+    type: DataTypes.STRING,
+    allowNull: false
+  }
+})
+
+
+//HTTP METHODS
+
+//GET
+app.get("/get-items", async (req, res) => {
+  try {
+    const items = await item.findAll();
+    res.status(200).json(items);
+  } catch (err) {
+    console.error(err);
+    res.status(500).send("Error fetching the items");
+  }
+});
+
+
+//POST
+app.post("/create-user", async (req, res)=> {
+    const {username, password} = req.body;
+
+    try{
+      const newUser = await user.create({
+        username,
+        password
+      });
+      res.status(201).json(newUser);
+    } catch(err){
+      console.error(err);
+      res.status(500).send("Error inserting the new user");
+    }
+})
+
 app.post("/create-item", async (req, res) => {
     const { name, isInStock, isInChart } = req.body;
   
@@ -61,18 +110,7 @@ app.post("/create-item", async (req, res) => {
     }
   });
 
-  //GET ALL ITEMS
-  app.get("/get-items", async (req, res) => {
-    try {
-      const items = await item.findAll();
-      res.status(200).json(items);
-    } catch (err) {
-      console.error(err);
-      res.status(500).send("Error fetching the items");
-    }
-  });
-
-  //DELETE ITEM BY ID
+  //DELETE
 app.delete("/delete-item/:id", async (req, res) => {
     const { id } = req.params;
   
